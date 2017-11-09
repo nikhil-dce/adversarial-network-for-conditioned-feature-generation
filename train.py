@@ -137,7 +137,11 @@ def main():
     
     g_summary_op = tf.summary.merge(g_summaries)
     d_summary_op = tf.summary.merge(d_summaries)
-        
+
+    # Accuracy Summary
+    acc_val = tf.placeholder(tf.float32)
+    summ_op = tf.summary.scalar('accuracy_score', acc_val)
+    
     session_config = tf.ConfigProto()
     session_config.gpu_options.allow_growth=True
     session_config.allow_soft_placement = True
@@ -181,11 +185,11 @@ def main():
             print('G_loss: {:.4}'.format(G_loss_curr))
             print('')
 
-        if it % 10000 == 0:
-            test_accuracy(sess, summary_writer, model, data_handler, config, it)
+        if it % 50000 == 0:
+            summ = test_accuracy(sess, summ_op, acc_val, model, data_handler, config)
+            summary_writer.add_summary(summ, it)
 
-
-def test_accuracy(sess, summary_writer, model, data_handler, config, measure_at_step):
+def test_accuracy(sess, summ_op, acc_val, model, data_handler, config):
 
     data_handler.load_test_data()
 
@@ -207,13 +211,9 @@ def test_accuracy(sess, summary_writer, model, data_handler, config, measure_at_
     svm_model = LinearSVM(config) 
     svm_model.train(x_syn_data, label_syn_data)
     accuracy = svm_model.measure_accuracy(data_handler.test_data, data_handler.test_label)
-
-    #acc_summary = tf.get_collection(tf.GraphKeys.SUMMARIES, scope='random')
-    acc_val = tf.placeholder(tf.float32)
-    summ_op = tf.summary.scalar('accuracy_score', acc_val)
-
+    
     summ = sess.run(summ_op, feed_dict={acc_val:accuracy})
-    summary_writer.add_summary(summ, measure_at_step)
+    return summ
         
     
 def sample_z(batch_size, z_dimen):
