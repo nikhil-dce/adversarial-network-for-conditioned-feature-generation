@@ -13,39 +13,40 @@ class Adversarial_Generator:
         self.trainable = True
         self.config = config
 
-    def build(self, x, z, c):
+    def G (self, z, c):
 
-        self.x = x
-        self.z = z
-        self.c = c
+        inputs = tf.concat(axis=1, values=[z, c])
+
+        with tf.variable_scope('generator'):
+
+            G_h1 = self.fc_layer(inputs, self.config.z_dim+self.config.attr_dim, self.config.gh_dim, 'h1')
+            G_h1 = tf.nn.leaky_relu(G_h1)
         
-        """ Discriminator Net model """
+            G_out = self.fc_layer(G_h1, self.config.gh_dim, self.config.x_dim, 'out')
+            G_out = tf.nn.leaky_relu(G_out)
         
-        self.D_W1 = tf.Variable(xavier_init([self.config.x_dim + self.config.attr_dim, self.config.dh_dim]))
-        self.D_b1 = tf.Variable(tf.zeros(shape=[self.config.dh_dim]))
+        return G_out
 
-        self.D_W2 = tf.Variable(xavier_init([self.config.dh_dim, 1]))
-        self.D_b2 = tf.Variable(tf.zeros(shape=[1]))
+    def D (self, x, c, reuse=None):
 
-        theta_D = [self.D_W1, self.D_W2, self.D_b1, self.D_b2]
+        inputs = tf.concat(axis=1, values=[x, c])
 
-        """ Generator Net model """
-        
-        self.G_W1 = tf.Variable(xavier_init([self.config.z_dim + self.config.attr_dim, self.config.gh_dim]))
-        self.G_b1 = tf.Variable(tf.zeros(shape=[self.config.gh_dim]))
+        with tf.variable_scope('discriminator', reuse=reuse):
 
-        self.G_W2 = tf.Variable(xavier_init([self.config.gh_dim, self.config.x_dim]))
-        self.G_b2 = tf.Variable(tf.zeros(shape=[self.config.x_dim]))
+            D_h1 = self.fc_layer(inputs, self.config.x_dim+self.config.attr_dim, self.config.dh_dim, 'h1')
+            D_h1 = tf.nn.relu(D_h1)
 
-        theta_G = [self.G_W1, self.G_W2, self.G_b1, self.G_b2]
+            D_logit = self.fc_layer(D_h1, self.config.dh_dim, 1, 'out')
+            D_prob = tf.nn.sigmoid(D_logit)
 
-        return theta_D, theta_G
+        return D_prob, D_logit
 
-    def loss (self):
+    def loss (self, x, z, c):
 
-        G_sample = self.generator(self.z, self.c)
-        D_real, D_logit_real = self.discriminator(self.x, self.c)
-        D_fake, D_logit_fake = self.discriminator(G_sample, self.c)
+        x_gen = self.G(z, c)
+        D_real, D_logit_real = self.D(x, c)
+        # reuse
+        D_fake, D_logit_fake = self.D(x_gen, c, reuse=True)
 
         D_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_real, labels=tf.ones_like(D_logit_real)))
         D_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.zeros_like(D_logit_fake)))
@@ -53,23 +54,21 @@ class Adversarial_Generator:
         G_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=D_logit_fake, labels=tf.ones_like(D_logit_fake)))
 
         return G_loss, D_loss
-        
-    def generator(self, z, c):
 
-        inputs = tf.concat(axis=1, values=[z, c])
-        G_h1 = tf.nn.relu(tf.matmul(inputs, self.G_W1) + self.G_b1)
-        G_log_prob = tf.matmul(G_h1, self.G_W2) + self.G_b2
-        G_prob = tf.nn.relu(G_log_prob)
+    def fc_layer(self, input_data, in_size, out_size, name):
 
-        return G_prob
+        with tf.variable_scope(name):
+            W, b = self.get_fc_var(in_size, out_size, name)
+            out = tf.matmul(input_data, W) + b
+            
+        return out
 
-    def discriminator(self, x ,c):
+    def get_fc_var(self, in_size, out_size, name):
 
-        inputs = tf.concat(axis=1, values=[x, c])
-        D_h1 = tf.nn.relu(tf.matmul(inputs, self.D_W1) + self.D_b1)
-        D_logit = tf.matmul(D_h1, self.D_W2) + self.D_b2
-        D_prob = tf.nn.sigmoid(D_logit)
+        initial_value = xavier_init([in_size, out_size])
+        W = tf.get_variable(name='weight', initializer=initial_value)
 
-        return D_prob, D_logit
+        initial_value = tf.zeros(shape=[out_size])
+        b = tf.get_variable(name='bias', initializer=initial_value)
 
-        
+        return W, b

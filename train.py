@@ -46,8 +46,7 @@ def main():
     
     data_handler = DataHandler(args.train_dir)
     data_handler.load_train_data()
-    #sys.exit()
-    
+        
     config = Config(args.batch_size, data_handler.x_dim, data_handler.attr_dim, args.z_dim, args.gh_dim, args.dh_dim, args.lr, args.g_steps)
     config.print_settings()
     
@@ -57,11 +56,15 @@ def main():
     z = tf.placeholder(tf.float32, shape=[None, config.z_dim])
     c = tf.placeholder(tf.float32, shape=[None, config.attr_dim])
     step = tf.placeholder(tf.float32)
+
     
-    theta_D, theta_G = model.build(x, z, c)
-    G_loss, D_loss = model.loss()
+    G_loss, D_loss = model.loss(x,z,c)
     D_coef = disc_coef(step)
     D_loss_final = D_loss * D_coef
+
+    theta_G = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+    theta_D = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
+    
     D_solver = tf.train.AdamOptimizer(learning_rate=args.lr).minimize(D_loss_final, var_list=theta_D)
     G_solver = tf.train.AdamOptimizer(learning_rate=args.lr).minimize(G_loss, var_list=theta_G)
 

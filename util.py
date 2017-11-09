@@ -8,4 +8,4 @@ def xavier_init(size):
 
 def disc_coef(i):
     
-    return (tf.tanh((i - 100000)/15000) +1)/2
+    return (tf.tanh((i - 10000)/15000) +1)/2
