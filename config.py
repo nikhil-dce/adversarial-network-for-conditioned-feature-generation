@@ -1,6 +1,6 @@
 class Config:
 
-    def __init__(self, batch_size, x_dim, attr_dim, z_dim, gh_dim, dh_dim, lr, g_steps):
+    def __init__(self, batch_size, x_dim, attr_dim, z_dim, gh_dim, dh_dim, lr, g_steps, d_steps):
 
         self.batch_size = batch_size
         self.x_dim = x_dim
@@ -10,6 +10,7 @@ class Config:
         self.dh_dim = dh_dim
         self.lr = lr
         self.g_steps = g_steps
+        self.d_steps = d_steps
 
     def print_settings(self):
 
@@ -21,3 +22,4 @@ class Config:
         print 'GH_dim: %d' % self.gh_dim
         print 'learning_rate: %d' % self.lr
         print 'g_steps: %d' % self.g_steps
+        print 'd_steps: %d' % self.d_steps

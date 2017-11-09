@@ -10,7 +10,8 @@ class DataHandler:
 
     def __init__(self, data_dir):
         self.data_dir = data_dir
-
+        self.test_data_loaded = False
+        
     def load_train_data(self):
 
         train_class_file = os.path.join(self.data_dir, 'trainclasses.txt')
@@ -54,3 +55,50 @@ class DataHandler:
         start_index = index
         end_index = index+batch_size
         return self.train_data[start_index:end_index], self.train_attr[start_index:end_index]
+
+    def load_test_data(self):
+
+        if self.test_data_loaded:
+            return
+
+        self.test_data_loaded = True
+        
+        test_class_file = os.path.join(self.data_dir, 'testclasses.txt')
+        test_label_file = os.path.join(self.data_dir, 'testLabels')
+        test_data_file = os.path.join(self.data_dir, 'testData')
+        all_attr_file = os.path.join(self.data_dir, 'dataAttributes')
+                
+        if not os.path.exists(test_class_file) or \
+           not os.path.exists(test_label_file) or \
+           not os.path.exists(test_data_file) or \
+           not os.path.exists(all_attr_file):
+            raise IOError("File cannot be read")
+
+        with open(test_class_file, 'r') as f:
+            data = f.readlines()
+
+        data = [line.strip() for line in data]
+
+        self.test_class_index, self.test_class_name = [], []
+
+        for d in data:
+            split_d = d.split('.')
+            self.test_class_index.append(int(split_d[0]))
+            self.test_class_name.append(split_d[1])
+
+        with open(test_label_file) as f:
+            self.test_label = np.load(f)
+            
+        with open(test_data_file) as f:
+            self.test_data = np.load(f)
+
+        with open(all_attr_file) as f:
+            self.test_attr = np.load(f)
+
+        self.test_attr = self.test_attr[self.test_class_index]
+        self.test_size = self.test_data.shape[0]
+        
+    def next_test_batch(self, index, batch_size):
+        start_index = index
+        end_index = index+batch_size
+        return self.test_data[start_index:end_index], self.test_attr[start_index:end_index]

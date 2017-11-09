@@ -1,5 +1,8 @@
 import tensorflow as tf
 
+def initialize_weights(size):
+    initial_value = tf.truncated_normal(size, 0.0, 0.001)
+    return initial_value
 
 def xavier_init(size):
     in_dim = size[0]
