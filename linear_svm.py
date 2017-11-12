@@ -47,3 +47,4 @@ class LinearSVM:
 
         avgAcc = avgAcc/len(allTestClasses) 
         print 'Average Class Accuracy = ' + str(avgAcc)
+        return avgAcc
