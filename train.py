@@ -53,10 +53,11 @@ def main():
     parser.add_argument('--train-dir', type=str)
     parser.add_argument('--logdir', type=str)
     parser.add_argument('--z-dim', type=int, default=100)
-    parser.add_argument('--g-steps', type=int, default=2)
+    parser.add_argument('--g-steps', type=int, default=1)
     parser.add_argument('--d-steps', type=int, default=1)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--wgan', type=bool, default=False)
+    parser.add_argument('--log-interval', type=int, default=50000)
     args = parser.parse_args()
 
     if not args.logdir and args.logdir.startswith('run'):
@@ -85,6 +86,7 @@ def main():
 
     if args.wgan:
         G_loss, D_loss = model.loss_WGAN(x,z,c)
+        reverse_D_loss = D_loss # The entire code remains the same
     else:
         G_loss, D_loss, reverse_D_loss = model.loss(x,z,c)
 
@@ -109,15 +111,16 @@ def main():
             reverse_d_summaries.append(tf.summary.histogram(var.op.name + '/gradients', grad))
 
     for grad, var in g_grads:
-            if grad is not None:
-                g_summaries.append(tf.summary.histogram(var.op.name + '/gradients', grad))
+        if grad is not None:
+            g_summaries.append(tf.summary.histogram(var.op.name + '/gradients', grad))
 
     d_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='discriminator')
 
     with tf.control_dependencies(d_update_ops):
         d_apply_gradients = D_solver.apply_gradients(d_grads, name='apply_disc_gradients')
         reverse_d_apply_gradients = D_solver.apply_gradients(reverse_d_grads, name='apply_disc_gradients')
-
+        clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in theta_D]
+        
     g_update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='generator')
     with tf.control_dependencies(g_update_ops):
         g_apply_gradients = G_solver.apply_gradients(g_grads, name='apply_gen_gradients')
@@ -181,14 +184,17 @@ def main():
 
             total_disc_steps += 1#disc_step + config.d_steps*it
 
-            if it > 7000000:
-                config.g_steps = 8
-            elif it > 500000:
-                config.g_steps = 6
-            elif it > 300000:
-                config.g_steps = 4
+            #if it > 7000000:
+            #    config.g_steps = 8
+            #elif it > 500000:
+            #    config.g_steps = 6
+            #elif it > 300000:
+            #    config.g_steps = 4
+            #else:
+            if args.wgan:
+                prob = 1
             else:
-                prob = 0.8
+                prob = 0.9
                 
             help_generator = not np.random.binomial(1, prob)
 
@@ -200,6 +206,7 @@ def main():
                     disc_run_array = [d_apply_gradients, D_loss, d_summary_op]
                                 
                 _, D_loss_curr, D_summary = sess.run(disc_run_array, feed_dict={x: x_batch, z: z_sample, c:c_batch, step:it})
+
                 summary_writer.add_summary(D_summary, total_disc_steps)
             else:
 
@@ -209,6 +216,10 @@ def main():
                     disc_run_array = [d_apply_gradients, D_loss]
 
                 _, D_loss_curr = sess.run(disc_run_array, feed_dict={x: x_batch, z: z_sample, c:c_batch, step:it})
+
+            if args.wgan:
+                _ = sess.run(clip_D)
+                    
 
         for gen_step in range(config.g_steps):
 
@@ -232,7 +243,7 @@ def main():
             print('G_loss: {:.4}'.format(G_loss_curr))
             print('')
 
-        if (it+1) % 50000 == 0:
+        if (it+1) % args.log_interval == 0:
             summ = test_accuracy(sess, summ_op, acc_val, model, data_handler, config)
             summary_writer.add_summary(summ, it)
 
